@@ -2,7 +2,7 @@ import os
 import random
 import logging
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, Chat
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -42,7 +42,12 @@ TODDLER_REPLIES = [
     "កូនល្អណាស់! ⭐",
     "មីចែឡើង",
     "ហៃយ៉ា",
-    "ធ្វើម៉ាស៊ីនឌីឌុក"
+    "ធ្វើម៉ាស៊ីនឌីឌុក",
+    "អូនចូលចិត្ត! 🥰",
+    "អូនមិនដឹងទេ! 😅",
+    "ស្អាតណាស់! ✨",
+    "អូនយល់ហើយ! 👍",
+    "អូនសប្បាយចិត្ត! 😊"
 ]
 
 # Special replies for different message types
@@ -183,14 +188,26 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle text messages"""
+    """Handle ALL text messages in private AND groups"""
     user_text = update.message.text
+    chat_type = update.message.chat.type
+    is_group = chat_type in [Chat.GROUP, Chat.SUPERGROUP]
+
+    # Log where the message came from
+    if is_group:
+        group_name = update.message.chat.title or "Unknown Group"
+        logger.info(f"Group message from {group_name}: {user_text[:50]}...")
+    else:
+        user_name = update.effective_user.first_name
+        logger.info(f"Private message from {user_name}: {user_text[:50]}...")
+
+    # Reply to ALL messages in both private and groups
     reply = toddler_response(user_text)
     await update.message.reply_text(reply)
 
 
 async def handle_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle sticker messages"""
+    """Handle ALL stickers in private AND groups"""
     sticker = update.message.sticker
     emoji = sticker.emoji if sticker.emoji else "🎨"
 
@@ -204,56 +221,56 @@ async def handle_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle photo messages"""
-    photo = update.message.photo[-1]  # Get the largest photo
+    """Handle ALL photos in private AND groups"""
+    photo = update.message.photo[-1]
     logger.info(f"Photo received: {photo.file_id}")
     await update.message.reply_text(random.choice(PHOTO_REPLIES))
 
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle voice messages"""
+    """Handle ALL voice messages in private AND groups"""
     voice = update.message.voice
     logger.info(f"Voice message received: {voice.file_id}")
     await update.message.reply_text(random.choice(VOICE_REPLIES))
 
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle video messages"""
+    """Handle ALL videos in private AND groups"""
     video = update.message.video
     logger.info(f"Video received: {video.file_id}")
     await update.message.reply_text(random.choice(VIDEO_REPLIES))
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle document messages"""
+    """Handle ALL documents in private AND groups"""
     document = update.message.document
     logger.info(f"Document received: {document.file_name}")
     await update.message.reply_text(random.choice(DOCUMENT_REPLIES))
 
 
 async def handle_animation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle GIF/animation messages"""
+    """Handle ALL GIFs/animations in private AND groups"""
     animation = update.message.animation
     logger.info(f"Animation received: {animation.file_id}")
     await update.message.reply_text(random.choice(ANIMATION_REPLIES))
 
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle location messages"""
+    """Handle ALL locations in private AND groups"""
     location = update.message.location
     logger.info(f"Location received: {location.latitude}, {location.longitude}")
     await update.message.reply_text(random.choice(LOCATION_REPLIES))
 
 
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle contact messages"""
+    """Handle ALL contacts in private AND groups"""
     contact = update.message.contact
     logger.info(f"Contact received: {contact.first_name} {contact.last_name or ''}")
     await update.message.reply_text(random.choice(CONTACT_REPLIES))
 
 
 async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle audio files"""
+    """Handle ALL audio files in private AND groups"""
     audio = update.message.audio
     logger.info(f"Audio received: {audio.file_id}")
     replies = [
@@ -265,7 +282,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_video_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle video note (round video) messages"""
+    """Handle ALL video notes in private AND groups"""
     video_note = update.message.video_note
     logger.info(f"Video note received: {video_note.file_id}")
     replies = [
@@ -274,6 +291,23 @@ async def handle_video_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "វីដេអូមូលកំប្លែង! 😂"
     ]
     await update.message.reply_text(random.choice(replies))
+
+
+async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Welcome message when bot is added to a group"""
+    if update.message.new_chat_members:
+        for member in update.message.new_chat_members:
+            if member.id == context.bot.id:
+                # Bot was added to the group
+                await update.message.reply_text(
+                    "សួស្តីអ្នកទាំងអស់គ្នា! 👋😁\n"
+                    "អូនឈ្មោះ កូទែម 👶\n"
+                    "អូនចូលចិត្តនិយាយ និងលេង!\n\n"
+                    "📢 អូននឹងឆ្លើយតបគ្រប់សារទាំងអស់!\n"
+                    "អូនសប្បាយចិត្តណាស់ដែលបាននៅទីនេះ! 🎉\n\n"
+                    "ចុច /help ដើម្បីមើលបន្ថែម 😊"
+                )
+                break
 
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -308,6 +342,12 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
 
+    # Add group welcome handler
+    app.add_handler(MessageHandler(
+        filters.StatusUpdate.NEW_CHAT_MEMBERS,
+        group_welcome
+    ))
+
     # Add message handlers - ORDER MATTERS!
     # Specific handlers first, then general ones
     app.add_handler(MessageHandler(filters.Sticker.ALL, handle_sticker))
@@ -321,7 +361,7 @@ def main():
     app.add_handler(MessageHandler(filters.AUDIO, handle_audio))
     app.add_handler(MessageHandler(filters.VIDEO_NOTE, handle_video_note))
 
-    # Text handler (not commands)
+    # TEXT handler - handles ALL text messages everywhere!
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     # Catch-all handler for any other message types
@@ -330,23 +370,26 @@ def main():
     # Add error handler
     app.add_error_handler(error_handler)
 
-    print("=" * 50)
+    print("=" * 60)
     print("👶 Toddler bot is running... (Khmer version 🇰🇭)")
-    print("📝 Supports ALL message types:")
-    print("   - Text messages")
-    print("   - Stickers")
-    print("   - Photos")
-    print("   - Voice messages")
-    print("   - Videos")
-    print("   - Documents")
-    print("   - GIFs/Animations")
-    print("   - Location")
-    print("   - Contacts")
-    print("   - Audio files")
-    print("   - Video notes")
-    print("=" * 50)
+    print("=" * 60)
+    print("📝 Message Types Supported:")
+    print("   ✅ Text messages (ALL - private AND groups)")
+    print("   ✅ Stickers")
+    print("   ✅ Photos")
+    print("   ✅ Voice messages")
+    print("   ✅ Videos")
+    print("   ✅ Documents")
+    print("   ✅ GIFs/Animations")
+    print("   ✅ Location")
+    print("   ✅ Contacts")
+    print("   ✅ Audio files")
+    print("   ✅ Video notes")
+    print("=" * 60)
+    print("📢 Group Mode: REPLIES TO EVERYTHING!")
+    print("=" * 60)
     print("Press Ctrl+C to stop")
-    print("=" * 50)
+    print("=" * 60)
 
     app.run_polling()
 
